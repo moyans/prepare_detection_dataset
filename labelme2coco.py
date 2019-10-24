@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 np.random.seed(41)
 
 #0为背景
-classname_to_id = {"person": 1}
+classname_to_id = {"text": 1}
 
 class Lableme2CoCo:
 
@@ -58,12 +58,20 @@ class Lableme2CoCo:
         image['height'] = h
         image['width'] = w
         image['id'] = self.img_id
-        image['file_name'] = os.path.basename(path).replace(".json", ".jpg")
+
+        # check the img postfix
+        _name =  os.path.basename(path).replace(".json", "")
+        _path = os.path.join(labelme_path, imgs_dict[_name])
+        print("loading: {}".format(imgs_dict[_name]))
+        assert os.path.exists(_path)
+        image['file_name'] = imgs_dict[_name]
         return image
 
     # 构建COCO的annotation字段
     def _annotation(self, shape):
-        label = shape['label']
+        # moyan add
+        # label = shape['label']
+        label = 'text'
         points = shape['points']
         annotation = {}
         annotation['id'] = self.ann_id
@@ -93,7 +101,11 @@ class Lableme2CoCo:
 
 
 if __name__ == '__main__':
-    labelme_path = "labelme/"
+
+    global labelme_path
+    imgType_list = {'.jpg','.JPG','.png','.jpeg','.PNG','.JPEG'}
+    
+    labelme_path = "/data/Data/发票/train/"
     saved_coco_path = "./"
     # 创建文件
     if not os.path.exists("%scoco/annotations/"%saved_coco_path):
@@ -104,6 +116,16 @@ if __name__ == '__main__':
         os.makedirs("%scoco/images/val2017"%saved_coco_path)
     # 获取images目录下所有的joson文件列表
     json_list_path = glob.glob(labelme_path + "/*.json")
+
+    all_file_list = os.listdir(labelme_path)
+    imgs_list_path = [_file for _file in all_file_list if os.path.splitext(_file)[-1] in imgType_list]
+    imgs_dict = {}
+    for _img in imgs_list_path:
+        _name, postfix = os.path.splitext(_img)
+        if _name == '20190701_IMG_0476':
+            print(_img)
+        imgs_dict[_name] = _img
+    
     # 数据划分,这里没有区分val2017和tran2017目录，所有图片都放在images目录下
     train_path, val_path = train_test_split(json_list_path, test_size=0.12)
     print("train_n:", len(train_path), 'val_n:', len(val_path))
@@ -113,9 +135,13 @@ if __name__ == '__main__':
     train_instance = l2c_train.to_coco(train_path)
     l2c_train.save_coco_json(train_instance, '%scoco/annotations/instances_train2017.json'%saved_coco_path)
     for file in train_path:
-        shutil.copy(file.replace("json","jpg"),"%scoco/images/train2017/"%saved_coco_path)
+        filename = os.path.basename(file).replace(".json", "")
+        imgPath = os.path.join(labelme_path, imgs_dict[filename])
+        shutil.copy(imgPath, "%scoco/images/train2017/"%saved_coco_path)
     for file in val_path:
-        shutil.copy(file.replace("json","jpg"),"%scoco/images/val2017/"%saved_coco_path)
+        filename = os.path.basename(file).replace(".json", "")
+        imgPath = os.path.join(labelme_path, imgs_dict[filename])
+        shutil.copy(imgPath, "%scoco/images/val2017/"%saved_coco_path)
 
     # 把验证集转化为COCO的json格式
     l2c_val = Lableme2CoCo()
